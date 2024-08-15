@@ -5,3 +5,5 @@
 **.txt
 **.png
 **.zip
+**/build/
+**/__pycache__/

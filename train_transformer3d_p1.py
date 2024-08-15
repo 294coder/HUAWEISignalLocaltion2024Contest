@@ -18,7 +18,7 @@ from lion_pytorch import Lion
 from Transformer3D import generate_model as generate_resnet3d
 from task_utils import EasyProgress, easy_logger, catch_any_error, get_virtual_memory
 from utilities import CosineAnnealingWarmRestartsReduce
-from data_processing.data_processing_3d_gt1 import read_slice_of_file
+from code3.zihan.data_processing.data_processing_3d_gt import read_slice_of_file
 
 # logger
 logger = easy_logger()

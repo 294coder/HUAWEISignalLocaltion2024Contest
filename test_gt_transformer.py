@@ -5,7 +5,7 @@ import h5py
 from rich.progress import track
 
 import Transformer3D
-from data_processing.data_processing_3d_gt1 import read_slice_of_file
+from code3.zihan.data_processing.data_processing_3d_gt import read_slice_of_file
 from rotate import gen_rotated_matrix
 from task_utils import easy_logger
 
