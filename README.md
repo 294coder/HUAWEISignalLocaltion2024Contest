@@ -1,4 +1,4 @@
-# 华为无线通信菁英赛
+# 华为无线通信菁英赛第三名解决方案
 
 <div align="center">
 <p style="text-align: center">
