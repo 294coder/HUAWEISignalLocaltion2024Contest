@@ -1,3 +1,4 @@
+import itertools
 import os
 import h5py
 import numpy as np
@@ -18,7 +19,6 @@ from lion_pytorch import Lion
 from Transformer3D import generate_model as generate_resnet3d
 from task_utils import EasyProgress, easy_logger, catch_any_error, get_virtual_memory
 from utilities import CosineAnnealingWarmRestartsReduce
-from code3.zihan.data_processing.data_processing_3d_gt import read_slice_of_file
 
 # logger
 logger = easy_logger()
@@ -28,7 +28,7 @@ def parse_opt(known=False):
 
     pos_n = 1
     parser.add_argument("--epochs", type=int, default=20)
-    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--fp16", action="store_true")
 
@@ -45,18 +45,18 @@ def parse_opt(known=False):
     
     parser.add_argument("--finetune", action='store_true')
     parser.add_argument("--pretrained-weight", type=str, default=None)
-    parser.add_argument("--prefixed_weight_path", type=str, default="/Data3/cao/ZiHanCao/huawei_contest/code3/zihan/ckpts")
+    parser.add_argument("--prefixed_weight_path", type=str, default="ckpts/")
     parser.add_argument("--prefix_weight_name", type=str, default="TransformerP1")
     
     # dataset files
-    parser.add_argument("--data_dir1", type=str, default="/Data3/cao/ZiHanCao/huawei_contest/data/Round3Pos1/train_new64.h5")
-    parser.add_argument("--data_dir2", type=str, default="/Data3/cao/ZiHanCao/huawei_contest/data/Round2Pos1/train.h5")
-    parser.add_argument("--data_dir3", type=str, default="/Data3/cao/ZiHanCao/huawei_contest/data/Round2Pos2/train.h5")
-    parser.add_argument("--data_dir4", type=str, default="/Data3/cao/ZiHanCao/huawei_contest/data/Round2Pos3/train.h5")
-    parser.add_argument("--anchor_path", type=str, default="/Data3/cao/ZiHanCao/datasets/huawei/round3Pos123P3.txt")
-    parser.add_argument("--anchor_path2", type=str, default="/Data3/cao/ZiHanCao/datasets/huawei/round2Pos123P3.txt")
-    parser.add_argument("--test_data_dir", type=str, default="/Data3/cao/ZiHanCao/huawei_contest/data/Round3Pos1/test_new64.h5")
-    parser.add_argument("--test_anchor_path", type=str, default="/Data3/cao/ZiHanCao/datasets/huawei/round3Pos123P3_test.txt")
+    parser.add_argument("--data_dir1", type=str, default="h5files/data/Round3Pos1/train_new64.h5")
+    parser.add_argument("--data_dir2", type=str, default="h5files/data/Round2Pos1/train.h5")
+    parser.add_argument("--data_dir3", type=str, default="h5files/data/Round2Pos2/train.h5")
+    parser.add_argument("--data_dir4", type=str, default="h5files/data/Round2Pos3/train.h5")
+    parser.add_argument("--anchor_path", type=str, default="h5files/anchor/round3Pos123P3.txt")
+    parser.add_argument("--anchor_path2", type=str, default="h5files/anchor/round2Pos123P3.txt")
+    parser.add_argument("--test_data_dir", type=str, default="h5files/data/test/test_new64.h5")
+    parser.add_argument("--test_anchor_path", type=str, default="h5files/anchor/round3Pos123P3_test.txt")
     
     opt = parser.parse_args()
     
@@ -87,6 +87,11 @@ slice_num = opt.slice_num
 slice_num_r2 = opt.slice_num_r2
 slice_num_test = opt.slice_num_test
 
+
+def read_slice_of_file(file_path, start, end):
+    with open(file_path, "r") as file:
+        slice_lines = list(itertools.islice(file, start, end))
+    return slice_lines
 
 ######################################################## MAIN ########################################################
 

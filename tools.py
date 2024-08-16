@@ -1,3 +1,4 @@
+import itertools
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.signal as sig
@@ -13,3 +14,8 @@ def eu_dis(ue1_pos, ue2_pos):
         + (ue1_pos[:, 1] - ue2_pos[:, 1]) ** 2
         + (ue1_pos[:, 2] - ue2_pos[:, 2] ** 2)
     )
+
+def read_slice_of_file(file_path, start, end):
+    with open(file_path, "r") as file:
+        slice_lines = list(itertools.islice(file, start, end))
+    return slice_lines

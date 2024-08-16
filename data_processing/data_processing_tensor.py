@@ -29,6 +29,9 @@ def Htmp_preprocess(Htmp, slice_samp_num, sc_num, ant_num, port_num):
 
 
 def data_transforming_train(cfg_path, slice_num, anchor_path, inputdata_path, save_path):
+    MEAN = np.array([-5.091097, -5.1093035, -5.0822234, -5.0828133], dtype=torch.float32)[None, None, None]
+    STD = np.array()([5.861487, 5.879711, 5.8663826, 5.875907], dtype=torch.float32)[None, None, None]
+    
     anchor_lines = read_slice_of_file(anchor_path, 0, slice_num)
     anchor_info = np.loadtxt(anchor_lines)
     slice_lines = read_slice_of_file(cfg_path, 1, 6)
@@ -82,7 +85,10 @@ def data_transforming_train(cfg_path, slice_num, anchor_path, inputdata_path, sa
         th_data = torch.nn.functional.interpolate(
             th_data, size=[64, 64, 64], mode="trilinear", align_corners=False
         )
-        data = th_data[0].permute(1, 2, 3, 0).numpy()
+        data = th_data[0].permute(1, 2, 3, 0).numpy()  # [64, 64, 64, 4]
+        ## normalize
+        data = (data - MEAN) / STD
+        
         h5["data"][cnt] = data
         print("save [{}/{}] data".format(cnt, slice_num))
         cnt += 1
