@@ -10,37 +10,40 @@ py_version = version.parse(sys.version.split()[0])
 logger.info(f"Python version: {py_version}")
 
 __all__ = [
-    "data_processing",
-    "data_transforming_train",
-    "data_transforming_test",
-    "data_transforming",
+    "dataTransforming"
 ]
 
 compare_version = lambda major, minor: py_version.major == major and py_version.minor == minor
 
 if compare_version(3, 7):
     assert (Path(__file__).parent / 'py39_module').exists(), 'py37_module not found.'
-    from .py37_module import data_transforming_train, data_transforming_test
+    from .py37_module import data_transforming
 elif compare_version(3, 8):
     assert (Path(__file__).parent / 'py38_module').exists(), 'py38_module not found.'
-    from .py38_module import data_transforming_train, data_transforming_test
+    from .py38_module import data_transforming
 elif compare_version(3, 9):
     assert (Path(__file__).parent / 'py39_module').exists(), 'py39_module not found.'
-    from .py39_module import data_transforming_train, data_transforming_test
+    from .py39_module import data_transforming
 elif compare_version(3, 10):
     assert (Path(__file__).parent / 'py310_module').exists(), 'py310_module not found.'
-    from .py310_module import data_transforming_train, data_transforming_test
+    from .py310_module import data_transforming
 elif compare_version(3, 12):
     assert (Path(__file__).parent / 'py312_module').exists(), 'py312_module not found.'
-    from .py312_module import data_transforming_train, data_transforming_test
+    from .py312_module import data_transforming
 else:
     raise RuntimeError("Python version should be [3.7, 3.8, 3.9, 3.10, 3.12]")
 
 
-def data_transforming(cfg_path, slice_num, anchor_path, inputdata_path, save_path, mode='train'):
-    if mode == 'train':
-        data_transforming_train(cfg_path, slice_num, anchor_path, inputdata_path, save_path)
-    elif mode == 'test':
-        data_transforming_test(cfg_path, anchor_path, inputdata_path, save_path)
-    else:
-        raise ValueError(f"Invalid mode: {mode}")
+def dataTransforming(cfgPath, N, GTPath, dataPath, h5Path, chunkSize):
+    """pre-processing the raw data into training and testing data
+
+    Args:
+        cfgPath (str): configure data, e.g, Round3CfgData1.txt
+        N (str): 500 for training and 20000 for testing
+        GTPath (str): anchor data, e.g, Round3InputPos1.txt
+        dataPath (str): input data, e.g, Round3InputData1.txt
+        h5Path (str): saved h5 file path, e.g, train.h5
+        chunkSize (int): chunk size for h5 data, for a fast loading.
+    """
+    
+    data_transforming(cfgPath, N, GTPath, dataPath, h5Path, chunkSize)

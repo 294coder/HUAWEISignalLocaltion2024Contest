@@ -21,7 +21,7 @@ from ema_pytorch import EMA
 # from models.transformer3d import segformer3d_base
 # from models.uniformer import uniformer_base, uniformer_small
 from models.convnext3d import generate_model as generate_resnet3d
-from task_utils import EasyProgress, easy_logger, catch_any_error, get_virtual_memory
+from task_utils import EasyProgress, easy_logger, catch_any_error, getMemInfo
 from data_processing import read_slice_of_file
 
 logger = easy_logger()
@@ -135,7 +135,7 @@ class TrainDataset(Dataset):
         
         data_dir1 = r"/Data3/cao/ZiHanCao/huawei_contest/data/Round3Pos2/train_new64.h5"
         file1 = h5py.File(data_dir1, "r")['data'][:]
-        get_virtual_memory(logger)
+        getMemInfo(logger)
         
         if not finetune:
             # data_dir2 = r"/Data3/cao/ZiHanCao/huawei_contest/data/Round1Pos2/all_new64.h5"
@@ -148,15 +148,15 @@ class TrainDataset(Dataset):
             
             data_dir4 = r"/Data3/cao/ZiHanCao/huawei_contest/data/Round2Pos1/train.h5"
             file4 = h5py.File(data_dir4, "r")['data'][:]
-            get_virtual_memory(logger)
+            getMemInfo(logger)
             
             data_dir5 = r"/Data3/cao/ZiHanCao/huawei_contest/data/Round2Pos2/train.h5"
             file5 = h5py.File(data_dir5, "r")['data'][:]
-            get_virtual_memory(logger)
+            getMemInfo(logger)
             
             data_dir6 = r"/Data3/cao/ZiHanCao/huawei_contest/data/Round2Pos3/train.h5"
             file6 = h5py.File(data_dir6, "r")['data'][:]
-            get_virtual_memory(logger)
+            getMemInfo(logger)
         
             anchor_path = r"/Data3/cao/ZiHanCao/datasets/huawei/round3Pos123P3.txt"
             anchor_path2 = r'/Data3/cao/ZiHanCao/datasets/huawei/round2Pos123P3.txt'
@@ -225,7 +225,7 @@ class TestDataset(Dataset):
         
         data_dir1 = r"/Data3/cao/ZiHanCao/huawei_contest/data/Round3Pos2/test_new64.h5"
         file1 = h5py.File(data_dir1, "r")['data'][:]
-        get_virtual_memory(logger)
+        getMemInfo(logger)
         
         # data_dir2 = r"/Data3/cao/ZiHanCao/huawei_contest/data/Round3Pos2/test.h5"
         # file2 = h5py.File(data_dir2, "r")['data']

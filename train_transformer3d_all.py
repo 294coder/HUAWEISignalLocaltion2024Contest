@@ -20,7 +20,7 @@ from ema_pytorch import EMA
 # from models.transformer3d import segformer3d_base
 # from models.uniformer import uniformer_base, uniformer_small
 from models.convnext3d import generate_model as generate_resnet3d
-from task_utils import EasyProgress, easy_logger, catch_any_error, get_virtual_memory
+from task_utils import EasyProgress, easy_logger, catch_any_error, getMemInfo
 from data_processing import read_slice_of_file
 
 logger = easy_logger()

@@ -227,7 +227,7 @@ def catch_any_error():
         LoguruLogger.remove_all()
         
 
-def get_virtual_memory(logger):
+def getMemInfo(logger):
     memory_info = psutil.virtual_memory()
     current_memory_usage = memory_info.used / (1024 ** 3)
     current_memory_available = memory_info.available / (1024 ** 3)

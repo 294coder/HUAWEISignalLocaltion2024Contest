@@ -9,7 +9,10 @@ py_version = sys.version_info
 output_dir = Path(__file__).parent / f"py{py_version.major}{py_version.minor}_module"
 output_dir.mkdir(exist_ok=True)
 setup(
-    ext_modules=cythonize("data_processing_tensor.py", language_level="3", build_dir=output_dir.as_posix()),
+    ext_modules=cythonize("data_processing_tensor.py", 
+                          language_level="3", 
+                          compiler_directives={'linetrace': False, 'annotation_typing': False, 'emit_code_comments': False},
+                          build_dir=output_dir.as_posix()),
     script_args=["build_ext", "--inplace"],
     packages=['data_processing'],
     package_dir={'data_processing': f"py{py_version.major}{py_version.minor}_module"},

@@ -16,8 +16,8 @@ from rich.progress import track
 from ema_pytorch import EMA
 from lion_pytorch import Lion
 
-from Transformer3D import generate_model as generate_resnet3d
-from task_utils import EasyProgress, easy_logger, catch_any_error, get_virtual_memory
+from Transformer3D import used_model
+from task_utils import EasyProgress, easy_logger, catch_any_error, getMemInfo
 from utilities import CosineAnnealingWarmRestartsReduce
 
 # logger
@@ -44,7 +44,7 @@ def parse_opt(known=False):
     parser.add_argument("--prefetch_factor", type=int, default=2)
     
     parser.add_argument("--finetune", action='store_true')
-    parser.add_argument("--pretrained-weight", type=str, default=None)
+    parser.add_argument("--pretrained_weight", type=str, default=None)
     parser.add_argument("--prefixed_weight_path", type=str, default="ckpts/")
     parser.add_argument("--prefix_weight_name", type=str, default="TransformerP1")
     
@@ -116,70 +116,70 @@ class FirstTrainOrFinetuneDataset(Dataset):
         super().__init__()
         
         file1 = h5py.File(opt.data_dir1, "r")["data"][:]
-        get_virtual_memory(logger)
+        getMemInfo(logger)
 
         if not opt.finetune:
             file2 = h5py.File(opt.data_dir2, "r")["data"][:]
-            get_virtual_memory(logger)
+            getMemInfo(logger)
 
             file3 = h5py.File(opt.data_dir3, "r")["data"][:]
-            get_virtual_memory(logger)
+            getMemInfo(logger)
 
             file4 = h5py.File(opt.data_dir4, "r")["data"][:]
-            get_virtual_memory(logger)
+            getMemInfo(logger)
 
-            anchor_path = opt.anchor_path
-            anchor_path2 = opt.anchor_path2
+            acPath = opt.anchor_path
+            acPath2 = opt.anchor_path2
 
-            global_idx_to_local = {}
+            h5FileIdxMapping = {}
             total_len = (
                 file1.shape[0] + file2.shape[0] + file3.shape[0] + file4.shape[0]
             )
             for i in range(total_len):
                 if i < file1.shape[0]:
-                    global_idx_to_local[i] = (0, i)
+                    h5FileIdxMapping[i] = (0, i)
                 elif i < file1.shape[0] + file2.shape[0]:
-                    global_idx_to_local[i] = (1, i - file1.shape[0])
+                    h5FileIdxMapping[i] = (1, i - file1.shape[0])
                 elif i < file1.shape[0] + file2.shape[0] + file3.shape[0]:
-                    global_idx_to_local[i] = (2, i - file1.shape[0] - file2.shape[0])
+                    h5FileIdxMapping[i] = (2, i - file1.shape[0] - file2.shape[0])
                 else:
-                    global_idx_to_local[i] = (3, i - file1.shape[0] - file2.shape[0] - file3.shape[0])
+                    h5FileIdxMapping[i] = (3, i - file1.shape[0] - file2.shape[0] - file3.shape[0])
 
-            data_files = [file1, file2, file3, file4]
-            truth_lines = read_slice_of_file(anchor_path, 0, opt.slice_num)
-            truth_lines2 = read_slice_of_file(anchor_path2, 0, opt.slice_num_r2)
-            self.gt_position = np.concatenate(
+            dataFiles = [file1, file2, file3, file4]
+            tL = read_slice_of_file(acPath, 0, opt.slice_num)
+            tL_n = read_slice_of_file(acPath2, 0, opt.slice_num_r2)
+            self.GT = np.concatenate(
                 (
-                    np.loadtxt(truth_lines).reshape(opt.slice_num, 2),
-                    np.loadtxt(truth_lines2).reshape(opt.slice_num_r2, 2),
+                    np.loadtxt(tL).reshape(opt.slice_num, 2),
+                    np.loadtxt(tL_n).reshape(opt.slice_num_r2, 2),
                 ),
                 axis=0,
             )
         else:
-            global_idx_to_local = {}
+            h5FileIdxMapping = {}
             for i in range(file1.shape[0]):
                 if i < file1.shape[0]:
-                    global_idx_to_local[i] = (0, i)
-            data_files = [file1]
-            anchor_path = opt.anchor_path
-            truth_lines = read_slice_of_file(anchor_path, 0, opt.slice_num)
-            self.gt_position = np.loadtxt(truth_lines).reshape(opt.slice_num, 2)
+                    h5FileIdxMapping[i] = (0, i)
+            dataFiles = [file1]
+            acPath = opt.anchor_path
+            tL = read_slice_of_file(acPath, 0, opt.slice_num)
+            self.GT = np.loadtxt(tL).reshape(opt.slice_num, 2)
 
-        self.global_idx_to_local = global_idx_to_local
-        self.data_files = data_files
+        self.h5FileIdxMapping = h5FileIdxMapping
+        self.dataF = dataFiles
 
     def __len__(self):
         return int((slice_num + slice_num_r2) * factor)
 
     def __getitem__(self, index):
-        global_idx = indices[index, 0]
-        dataset_idx, idx = self.global_idx_to_local[global_idx]
+        GIdx = indices[index, 0]
+        h5Idx, idx = self.h5FileIdxMapping[GIdx]
 
-        data = self.data_files[dataset_idx][idx]
+        xx = self.dataF[h5Idx][idx]
 
         return (
-            data,
-            self.gt_position[global_idx : global_idx + 1, :],
+            xx,
+            self.GT[GIdx : GIdx + 1, :],
         )
 
 
@@ -189,35 +189,35 @@ class FirstTestOrFinetuneDataset(Dataset):
         
         data_dir1 = opt.test_data_dir
         file1 = h5py.File(data_dir1, "r")["data"][:]
-        get_virtual_memory(logger)
+        getMemInfo(logger)
         
-        anchor_path = opt.test_anchor_path
-        global_idx_to_local = {}
-        total_len = file1.shape[0]
-        for i in range(total_len):
+        acPath = opt.test_anchor_path
+        h5FileIdxMapping = {}
+        TL = file1.shape[0]
+        for i in range(TL):
             if i < file1.shape[0]:
-                global_idx_to_local[i] = (0, i)
-        self.global_idx_to_local = global_idx_to_local
+                h5FileIdxMapping[i] = (0, i)
+        self.global_idx_to_local = h5FileIdxMapping
 
-        data_files = [file1]
-        self.data_files = data_files
+        dataF = [file1]
+        self.dataF = dataF
 
         self.datalist = []
-        truth_lines = read_slice_of_file(anchor_path, 0, 50)
-        self.absolut_pos = np.loadtxt(truth_lines).reshape(opt.slice_num_test, 2)
+        TLs = read_slice_of_file(acPath, 0, 50)
+        self.GT = np.loadtxt(TLs).reshape(opt.slice_num_test, 2)
 
     def __len__(self):
         return slice_num_test
 
     def __getitem__(self, index):
-        global_idx = index
-        dataset_idx, idx = self.global_idx_to_local[global_idx]
+        GIdx = index
+        DIdx, idx = self.global_idx_to_local[GIdx]
 
-        rand_data = self.data_files[dataset_idx][idx]
+        xx = self.dataF[DIdx][idx]
 
         return (
-            rand_data,
-            self.absolut_pos[global_idx : global_idx + 1, :],
+            xx,
+            self.GT[GIdx : GIdx + 1, :],
         )
 
      
@@ -251,7 +251,7 @@ def main(opt):
     )
     test_loader = DataLoader(
         test_dataset, 
-        batch_size=1, 
+        batch_size=1,   # 1 is enough
         shuffle=False, 
         num_workers=2,
         pin_memory=True
@@ -265,7 +265,7 @@ def main(opt):
     )
     
     # model
-    model = generate_resnet3d(10)
+    model = used_model()
 
     # finetune loading
     if opt.finetune:
@@ -295,14 +295,14 @@ def main(opt):
     critrtion = nn.L1Loss()
         
     # get exponential moving average model
-    ema_model = EMA(model, beta=0.995, update_every=1)
+    emaModel = EMA(model, beta=0.995, update_every=1)
 
     # overall accuracies
     acc = {}
 
     # print MEAN and STD
-    logger.info("MEAN={}".format(MEAN))
-    logger.info("STD={}".format(STD))
+    # logger.info("MEAN={}".format(MEAN))
+    # logger.info("STD={}".format(STD))
 
     logger.info('start training...')
     for epoch in range(1, opt.num_epoch):
@@ -322,8 +322,8 @@ def main(opt):
                 ):
 
                     # normalize
-                    input1 = (input1 - MEAN.to(input1)) / STD.to(input1)
-                    input1 = input1.permute(0, 4, 1, 2, 3)
+                    # input1 = (input1 - MEAN.to(input1)) / STD.to(input1)
+                    # input1 = input1.permute(0, 4, 1, 2, 3)
                     output1 = model(input1)
 
                     # loss functions
@@ -341,7 +341,7 @@ def main(opt):
                     torch.nn.utils.clip_grad_norm_(model.parameters(), 0.03)
                     optimizer.step()
 
-                ema_model.update()
+                emaModel.update()
                 lr_scheduler.step()
 
                 loss_epoch += loss.item()
@@ -358,7 +358,7 @@ def main(opt):
                 if (batch_idx + 1) % 100 == 0:
                     b += 1
                     model.eval()
-                    ema_model.eval()
+                    emaModel.eval()
                     save_path = f"{opt.prefixed_weight_path}/{opt.prefix_weight_name}/ep_{epoch}_iter{batch_idx}.pth"
                     logger.info("save model to {}".format(save_path))
                     with torch.no_grad():
@@ -368,10 +368,10 @@ def main(opt):
                             input1 = data.cuda(device=opt.device).float()
 
                             # normalize
-                            input1 = (input1 - MEAN.to(input1)) / STD.to(input1)
-                            input1 = input1.permute(0, 4, 1, 2, 3)
+                            # input1 = (input1 - MEAN.to(input1)) / STD.to(input1)
+                            # input1 = input1.permute(0, 4, 1, 2, 3)
                             target = target.cuda(device=opt.device).float().reshape(1, 2)
-                            output1 = ema_model(input1)
+                            output1 = emaModel(input1)
                             
                             loss = critrtion(output1, target.float())
 
@@ -418,7 +418,7 @@ def main(opt):
 
                     # save EMA model
                     logger.info("model saved to {}".format(save_path))
-                    ema_params = ema_model.ema_model.state_dict()
+                    ema_params = emaModel.ema_model.state_dict()
                     torch.save(ema_params, save_path)
                     logger.info("model saved")
                     logger.info(

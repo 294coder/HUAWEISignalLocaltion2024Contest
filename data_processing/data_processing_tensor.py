@@ -28,9 +28,9 @@ def Htmp_preprocess(Htmp, slice_samp_num, sc_num, ant_num, port_num):
     return Htmp
 
 
-def data_transforming_train(cfg_path, slice_num, anchor_path, inputdata_path, save_path):
-    MEAN = np.array([-5.091097, -5.1093035, -5.0822234, -5.0828133], dtype=torch.float32)[None, None, None]
-    STD = np.array()([5.861487, 5.879711, 5.8663826, 5.875907], dtype=torch.float32)[None, None, None]
+def data_transforming(cfg_path, slice_num, anchor_path, inputdata_path, save_path, bs_chunk):
+    MEAN = np.array([-5.091097, -5.1093035, -5.0822234, -5.0828133], dtype=torch.float32).reshape(4, 1, 1, 1)
+    STD = np.array([5.861487, 5.879711, 5.8663826, 5.875907], dtype=torch.float32).reshape(4, 1, 1, 1)
     
     anchor_lines = read_slice_of_file(anchor_path, 0, slice_num)
     anchor_info = np.loadtxt(anchor_lines)
@@ -48,8 +48,11 @@ def data_transforming_train(cfg_path, slice_num, anchor_path, inputdata_path, sa
     angle_resol_azi = 64
 
     h5 = h5py.File(save_path, "w")
-    h5.create_dataset(
-        "data", (slice_num, 64, angle_resol_ele, angle_resol_azi, 4), dtype=np.float32
+    h5_data = h5.create_dataset(
+        "data", 
+        shape=(slice_num, 4, 64, angle_resol_ele, angle_resol_azi),
+        chunks=(bs_chunk, 4, 64, angle_resol_ele, angle_resol_azi),
+        dtype=np.float32
     )
     slice_all = read_slice_of_file(inputdata_path, 0, 4000)
     Htmp_all = np.loadtxt(slice_all)
@@ -85,16 +88,21 @@ def data_transforming_train(cfg_path, slice_num, anchor_path, inputdata_path, sa
         th_data = torch.nn.functional.interpolate(
             th_data, size=[64, 64, 64], mode="trilinear", align_corners=False
         )
-        data = th_data[0].permute(1, 2, 3, 0).numpy()  # [64, 64, 64, 4]
+        data = th_data[0].numpy()  #.permute(1, 2, 3, 0).numpy()  # [64, 64, 64, 4]
         ## normalize
         data = (data - MEAN) / STD
-        
-        h5["data"][cnt] = data
+        h5_data[cnt] = data
         print("save [{}/{}] data".format(cnt, slice_num))
         cnt += 1
     h5.close()
+    print('save h5 file done')
+ 
+ 
+# decrepated   
+def _data_transforming_test(cfg_path, inputdata_path, save_path) -> None:
+    MEAN = np.array([-5.091097, -5.1093035, -5.0822234, -5.0828133], dtype=torch.float32)[None, None, None]
+    STD = np.array()([5.861487, 5.879711, 5.8663826, 5.875907], dtype=torch.float32)[None, None, None]
     
-def data_transforming_test(cfg_path, inputdata_path, save_path) -> None:
     slice_num = 20000
     slice_lines = read_slice_of_file(cfg_path, 1, 6)
     info = np.loadtxt(slice_lines)
@@ -110,7 +118,8 @@ def data_transforming_test(cfg_path, inputdata_path, save_path) -> None:
     angle_resol_azi = 64
 
     h5 = h5py.File(save_path, "w")
-    h5.create_dataset("data", (slice_num, 64, 64, 64, 4), dtype=np.float32, chunks=(1, 64, 64, 64, 4))
+    h5_data = h5.create_dataset("data", (slice_num, 64, 64, 64, 4), dtype=np.float32, chunks=(1, 64, 64, 64, 4))
+    
     slice_all = read_slice_of_file(inputdata_path, 0, 20000)
     Htmp_all = np.loadtxt(slice_all)
     for slice_idx in trange(20000):
@@ -153,19 +162,22 @@ def data_transforming_test(cfg_path, inputdata_path, save_path) -> None:
         ra_abs = db(ra_graph)
         data = (ra_abs).astype(np.float32).squeeze()
         th_data = torch.tensor(data).type(torch.float32).unsqueeze(0)
-        th_data = th_data.permute(0, -1, 1, 2, 3)
+        th_data = th_data.permute(0, -1, 1, 2, 3)  # [1, 64, 64, 64, 4]
         data = th_data[0].permute(1, 2, 3, 0).numpy()
-        h5["data"][cnt] = data
+        # normalize
+        data = (data - MEAN) / STD
+        
+        # save
+        h5_data[cnt] = data
         print("save [{}/{}] data".format(cnt, slice_num))
         cnt += 1
     h5.close()
 
 
-
 if __name__ == "__main__":
-    cfg_path = r"/Data4/exps/dataset/Round0CfgData3.txt"
+    cfg_path = r"/Data3/cao/ZiHanCao/datasets/huawei/Round3/Round3CfgData1.txt"
     inputdata_path = r"/Data4/exps/dataset/Round0InputData3.txt"
-    save_path = r"/Data3/cao/ZiHanCao/huawei_contest/data/Round0Pos3/all_old64.h5"
-    anchor_path = r"/Data4/exps/dataset/Round0InputPos3.txt"
+    save_path = r"/Data3/cao/ZiHanCao/huawei_contest/code3/zihan/h5file/tmp/train.h5"
+    anchor_path = r"/Data3/cao/ZiHanCao/datasets/huawei/Round3/Round3InputPos1.txt"
     # truth_path = r"/Data3/cao/ZiHanCao/datasets/huawei/Round0/Round0GroundTruth1.txt"
-    data_transforming_train(cfg_path, anchor_path, inputdata_path, save_path)
+    data_transforming(cfg_path, anchor_path, inputdata_path, save_path)

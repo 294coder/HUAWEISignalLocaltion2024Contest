@@ -12,8 +12,8 @@ from tqdm import tqdm
 from enum import Enum
 
 import Transformer3D
-from rotate import gen_rotated_matrix
-from task_utils import easy_logger, get_virtual_memory
+from code3.zihan.rotate_fields import gen_rotated_matrix
+from task_utils import easy_logger, getMemInfo
 from tools import read_slice_of_file
 
 logger = easy_logger()
@@ -22,7 +22,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', type=str, default='cuda:0', help='device')
     parser.add_argument('--pos_n', type=int, default=1, help='posN')
-    parser.add_argument('--loading_strategy', type=str, default='ALL', help='loading strategy')
+    parser.add_argument('--loading_strategy', type=str, default='ALL', help='loading strategy', choices=['ALL', 'PART', 'ONFLY'])
     
     args = parser.parse_args()
     
@@ -237,7 +237,7 @@ class TestSplitedDataset(Dataset):
             # self.data = f['data'][:2000]  # 2000 is the number of samples in each h5 file
             self.data = self._per_sample_fast_loading(f['data'])
             f.close()
-            get_virtual_memory(logger)
+            getMemInfo(logger)
             
             in_h5_idx = idx - self.sub_h5_idx * 2000
             return self.data[in_h5_idx]
@@ -255,7 +255,7 @@ class TestSplitedDataset(Dataset):
         data_lst = []
         for f in tqdm(self.h5_files, total=len(self.h5_files), desc='Loading h5 files...'):
             data_lst.append(f['data'][:])
-            get_virtual_memory(logger)
+            getMemInfo(logger)
             logger.info(f'loading data from [{f.filename}] h5 file...')
         data = np.concatenate(data_lst, axis=0)
         
