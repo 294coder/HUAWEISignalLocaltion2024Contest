@@ -351,13 +351,11 @@ class Runner:
 
         model = model.cuda(device=device)
 
-        output = []
         logger.info("model predict...")
         file = open(infFile, "w")
         
         gtListIdx = 0
         bs = test_loader.batch_size
-        error = 0
         formatString = '{:.4f} {:.4f}\n'
         for i, xx in track(enumerate(test_loader), total=len(test_loader),
                             description='Inference ...'):
