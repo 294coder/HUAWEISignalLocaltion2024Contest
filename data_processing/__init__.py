@@ -1,3 +1,24 @@
+"""
+Author: Zihan Cao
+Email: iamzihan666@gmail.com
+Date: 2024/08/17 23:57
+
+                                        Copyright (c) 2024
+                                        UESTC, All rights reserved.
+"""
+
+
+
+"""
+
+import compiled date_processing module based on python version and platform
+
+supported python version: [3.7, 3.8, 3.9, 3.10, 3.12] on linux
+supported python version: [3.9] on windows
+
+"""
+
+
 import sys
 from pathlib import Path
 from packaging import version
@@ -13,25 +34,37 @@ __all__ = [
     "dataTransforming"
 ]
 
+# python version
 compare_version = lambda major, minor: py_version.major == major and py_version.minor == minor
 
-if compare_version(3, 7):
-    assert (Path(__file__).parent / 'py39_module').exists(), 'py37_module not found.'
-    from .py37_module import data_transforming
-elif compare_version(3, 8):
-    assert (Path(__file__).parent / 'py38_module').exists(), 'py38_module not found.'
-    from .py38_module import data_transforming
-elif compare_version(3, 9):
-    assert (Path(__file__).parent / 'py39_module').exists(), 'py39_module not found.'
-    from .py39_module import data_transforming
-elif compare_version(3, 10):
-    assert (Path(__file__).parent / 'py310_module').exists(), 'py310_module not found.'
-    from .py310_module import data_transforming
-elif compare_version(3, 12):
-    assert (Path(__file__).parent / 'py312_module').exists(), 'py312_module not found.'
-    from .py312_module import data_transforming
+# platform
+platform = sys.platform
+
+logger.info(f"Platform: {platform}")
+if platform == 'win32':
+    if compare_version(3, 9):
+        assert (Path(__file__).parent / 'py39_module').exists(), 'py39_module not found.'
+        from .py39_module import data_transforming
+    else:
+        raise RuntimeError("Python version should be 3.9")
 else:
-    raise RuntimeError("Python version should be [3.7, 3.8, 3.9, 3.10, 3.12]")
+    if compare_version(3, 7):
+        assert (Path(__file__).parent / 'py39_module').exists(), 'py37_module not found.'
+        from .py37_module import data_transforming
+    elif compare_version(3, 8):
+        assert (Path(__file__).parent / 'py38_module').exists(), 'py38_module not found.'
+        from .py38_module import data_transforming
+    elif compare_version(3, 9):
+        assert (Path(__file__).parent / 'py39_module').exists(), 'py39_module not found.'
+        from .py39_module import data_transforming
+    elif compare_version(3, 10):
+        assert (Path(__file__).parent / 'py310_module').exists(), 'py310_module not found.'
+        from .py310_module import data_transforming
+    elif compare_version(3, 12):
+        assert (Path(__file__).parent / 'py312_module').exists(), 'py312_module not found.'
+        from .py312_module import data_transforming
+    else:
+        raise RuntimeError("Python version should be [3.7, 3.8, 3.9, 3.10, 3.12]")
 
 
 def dataTransforming(cfgPath, N, GTPath, dataPath, h5Path, chunkSize):

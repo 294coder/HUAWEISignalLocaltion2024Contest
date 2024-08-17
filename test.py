@@ -13,7 +13,7 @@ from tqdm import tqdm
 from enum import Enum
 import time
 
-import Transformer3D
+import models.Transformer3D as Transformer3D
 from rotate_fields import gen_rotated_matrix
 from task_utils import catch_any_error, easy_logger, getMemInfo
 from tools import read_slice_of_file
@@ -52,17 +52,11 @@ loadingStrategy = {"ALL": LoadingStrategy.ALL,
                    "NPART": LoadingStrategy.NPART,
                    "PART": LoadingStrategy.PART, 
                    "ONFLY": LoadingStrategy.ONFLY}[args.loadingStrategy]
-
 weightPath = {
-    1: "/Data3/cao/ZiHanCao/huawei_contest/code3/zihan/ckpts/finetuneTransformerP1/ep_1_iter199.pth",
-    2: "/Data3/cao/ZiHanCao/huawei_contest/code3/zihan/ckpts/finetuneTransformerP2/ep_1_iter99.pth",
-    3: "/Data3/cao/ZiHanCao/huawei_contest/code3/zihan/ckpts/finetuneTransformer3dP3/ep_1_iter199.pth",
+    1: "ckpts/R3P1.pth",
+    2: "ckpts/R3P2.pth",
+    3: "ckpts/R3P3.pth",
 }[posN]
-# weightPath = {
-#     1: "ckpts/R3P1.pth",
-#     2: "ckpts/R3P2.pth",
-#     3: "ckpts/R3P3.pth",
-# }[posN]
 acFile = f"h5file/R3Anchors/Round3PosAll.txt"
 acFile2 = f"h5file/R3Anchors/Round3InputPos{posN}.txt"
 infFile = f"results/Round3OutputPos{posN}.txt"

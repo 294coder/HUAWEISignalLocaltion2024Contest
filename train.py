@@ -1,23 +1,18 @@
 import itertools
-import os
 import h5py
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
 from torch.cuda.amp import GradScaler
 from torch.utils.data import DataLoader, Dataset
 from pathlib import Path
-from collections import OrderedDict
 import argparse
-from tqdm import tqdm
 from rich.progress import track
 from ema_pytorch import EMA
 from lion_pytorch import Lion
 from accelerate import Accelerator
 
-from Transformer3D import used_model
+from models.Transformer3D import used_model
 from task_utils import EasyProgress, easy_logger, catch_any_error, getMemInfo
 from utilities import CosineAnnealingWarmRestartsReduce
 from constants import TrainingConstants
