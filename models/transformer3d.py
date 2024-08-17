@@ -8,17 +8,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def get_inplanes():
-    return [64, 128, 256, 512]
-
-
-def conv3x3x3(in_planes, out_planes, stride=1):
+def conv3D3x3(in_planes, out_planes, stride=1):
     return nn.Conv3d(
         in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False
     )
 
 
-def conv1x1x1(in_planes, out_planes, stride=1):
+def conv3D1x1(in_planes, out_planes, stride=1):
     return nn.Conv3d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
 
 
@@ -218,10 +214,10 @@ class BasicBlock(nn.Module):
     def __init__(self, in_planes, planes, stride=1, downsample=None, transf=False):
         super().__init__()
 
-        self.conv1 = conv3x3x3(in_planes, planes, stride)
+        self.conv1 = conv3D3x3(in_planes, planes, stride)
         self.bn1 = nn.BatchNorm3d(planes)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3x3(planes, planes)
+        self.conv2 = conv3D3x3(planes, planes)
         self.bn2 = nn.BatchNorm3d(planes)
         self.downsample = downsample
         self.stride = stride
@@ -260,11 +256,11 @@ class Bottleneck(nn.Module):
     def __init__(self, in_planes, planes, stride=1, downsample=None, transf=False):
         super().__init__()
 
-        self.conv1 = conv1x1x1(in_planes, planes)
+        self.conv1 = conv3D1x1(in_planes, planes)
         self.bn1 = nn.BatchNorm3d(planes)
-        self.conv2 = conv3x3x3(planes, planes, stride)
+        self.conv2 = conv3D3x3(planes, planes, stride)
         self.bn2 = nn.BatchNorm3d(planes)
-        self.conv3 = conv1x1x1(planes, planes * self.expansion)
+        self.conv3 = conv3D1x1(planes, planes * self.expansion)
         self.bn3 = nn.BatchNorm3d(planes * self.expansion)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
@@ -422,7 +418,7 @@ class Transformer3d(nn.Module):
                 )
             else:
                 downsample = nn.Sequential(
-                    conv1x1x1(self.blockInputChannels, planes * block.expansion, stride),
+                    conv3D1x1(self.blockInputChannels, planes * block.expansion, stride),
                     nn.BatchNorm3d(planes * block.expansion),
                 )
 

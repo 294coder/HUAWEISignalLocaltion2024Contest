@@ -8,5 +8,7 @@
 **/build/
 **/__pycache__/
 **baidu**
+**.vscode/
 
 !算法设计文档/*.png
+!requirementList.txt
