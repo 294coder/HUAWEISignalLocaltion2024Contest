@@ -11,12 +11,12 @@
 ## 环境配置
 请运行下面命令安装环境：
 
-```shell
+```sh
 pip install -r requirementList.txt
 ```
 > torch的版本需要 > 2.1.0。
 
-> 数据处理代码依赖于C代码，请**务必使用**Python 3.9或者3.12，也许支持3.7，3.8和3.10。
+> 数据处理代码依赖于C代码，请**务必使用**Python 3.9或者3.12，也许支持3.7，3.8和3.10。如果您使用Windows平台，则只支持Python 3.9。*我们强烈建议您使用Linux平台进行训练和测试*。
 
 ## 测试
 
@@ -62,7 +62,7 @@ pip install -r requirementList.txt
 
 确保路径正确后，运行测试代码：
 ```sh
-python test_gt_transformer.py --posN <POS_N> --loadingStrategy <LS>
+python test.py --posN <POS_N> --loadingStrategy <LS>
 ```
 其中，`<POS_N>`是三个场景，可以是`(1,2,3)`中的一个，`<LS>`是数据loading策略，可以是`(ALL, NPART, PART, ONFLY)`中的一个。
 为了提高测试速度，请依据不同的机器配置选择不同的预处理数据loading方式：
