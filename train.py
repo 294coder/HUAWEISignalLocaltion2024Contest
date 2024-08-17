@@ -311,9 +311,6 @@ def main(opt):
     # get accelerator
     accelerator = Accelerator(fp16=opt.fp16)
     
-    # prepare select set
-    IdxMapping = prepare_matrix_set(TrainingNR3, TrainingNR2, fact)
-    
     # load dataset
     logger.info("loading dataset ...")
     train_dataset = FirstTrainOrFinetuneDataset()
