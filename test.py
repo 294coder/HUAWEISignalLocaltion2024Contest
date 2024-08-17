@@ -16,7 +16,6 @@ import time
 import models.Transformer3D as Transformer3D
 from rotate_fields import gen_rotated_matrix
 from task_utils import catch_any_error, easy_logger, getMemInfo
-from tools import read_slice_of_file
 from constants import TestConstants
 
 logger = easy_logger()
@@ -70,6 +69,10 @@ sNumR1 = const.sNumR1
 SNumTest = const.SNumTest
 AcLen = const.AcLen
 
+def read_slice_of_file(file_path, start, end):
+    with open(file_path, "r") as file:
+        slice_lines = list(itertools.islice(file, start, end))
+    return slice_lines
 
 class TestDataset(Dataset):
     def __init__(self):
