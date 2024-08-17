@@ -388,7 +388,7 @@ class Runner:
                     file.write(pos)
             if loadingStrategy != LoadingStrategy.ONFLY:
                 endTimeFn()
-                logger.info(f'inference time total: {np.sum(cls.timeLst):.3f} second')
+                logger.info(f'[red underline]inference time total: {np.sum(cls.timeLst):.3f} second[/red underline]')
         
         file.close()
     
