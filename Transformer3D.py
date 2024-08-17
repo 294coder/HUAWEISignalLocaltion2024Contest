@@ -1,5 +1,6 @@
 import math
 from functools import partial
+from typing import Literal, Union
 
 from einops import rearrange
 import torch
@@ -302,91 +303,117 @@ class Bottleneck(nn.Module):
 
 
 class Transformer3d(nn.Module):
-
+    """
+        Args:
+            blockType (Union[BasicBlock, Bottleneck]): Type of block used in the model.
+            nLayers (list[int]): List of integers representing the number of layers in each block.
+            blockInputChannels (list[int]): List of integers representing the number of input channels for each block.
+            nC (int, optional): Number of input channels. Defaults to 4.
+            InputConvTSize (int, optional): Size of the input convolutional kernel. Defaults to 7.
+            InputConvTStride (int, optional): Stride of the input convolutional kernel. Defaults to 1.
+            NotHasMaxPool (bool, optional): Flag indicating whether to use max pooling. Defaults to False.
+            residualTyp (str, optional): Type of residual connection. Defaults to "B".
+            Factor (float, optional): Factor to scale the number of input channels. Defaults to 1.
+            outputC (int, optional): Number of output channels. Defaults to 2.
+        Attributes:
+            blockInputChannels (int): Number of input channels for the first block.
+            notHasMaxPool (bool): Flag indicating whether max pooling is used.
+            conv1 (nn.Conv3d): 3D convolutional layer for the input.
+            bn1 (nn.BatchNorm3d): Batch normalization layer.
+            relu (nn.ReLU): ReLU activation function.
+            maxpool (nn.MaxPool3d): Max pooling layer.
+            layer1 (nn.Sequential): First layer of blocks.
+            layer2 (nn.Sequential): Second layer of blocks.
+            layer3 (nn.Sequential): Third layer of blocks.
+            layer4 (nn.Sequential): Fourth layer of blocks.
+            avgpool (nn.AdaptiveAvgPool3d): Adaptive average pooling layer.
+            fc (nn.Linear): Fully connected layer for the output.
+        Methods:
+            _downsample_basic_block(x, planes, stride): Downsamples the input tensor.
+            _make_layer(block, planes, blocks, shortcut_type, stride=1): Creates a layer of blocks.
+            forward(x): Forward pass of the model.
+    """
     def __init__(
         self,
-        block,
-        layers,
-        block_inplanes,
-        n_input_channels=4,
-        conv1_t_size=7,
-        conv1_t_stride=1,
-        no_max_pool=False,
-        shortcut_type="B",
-        widen_factor=1.0,
-        n_classes=2,
+        blockType: "Union[BasicBlock, Bottleneck]",
+        nLayers: list[int],
+        blockInputChannels: list[int],
+        nC: int = 4,
+        InputConvTSize: int = 7,
+        InputConvTStride: int = 1,
+        NotHasMaxPool: bool = False,
+        residualTyp: str = "B",
+        Factor: float = 1.,
+        outputC: int = 2,
     ):
         super().__init__()
 
-        block_inplanes = [int(x * widen_factor) for x in block_inplanes]
+        blockInputChannels = [int(x * Factor) for x in blockInputChannels]
 
-        self.in_planes = block_inplanes[0]
-        self.no_max_pool = no_max_pool
+        self.blockInputChannels = blockInputChannels[0]
+        self.notHasMaxPool = NotHasMaxPool
 
         self.conv1 = nn.Conv3d(
-            n_input_channels,
-            self.in_planes,
-            kernel_size=(conv1_t_size, 7, 7),
-            stride=(conv1_t_stride, 2, 2),
-            padding=(conv1_t_size // 2, 3, 3),
+            nC,
+            self.blockInputChannels,
+            kernel_size=(InputConvTSize, 7, 7),
+            stride=(InputConvTStride, 2, 2),
+            padding=(InputConvTSize // 2, 3, 3),
             bias=False,
         )
-        self.bn1 = nn.BatchNorm3d(self.in_planes)
+        self.bn1 = nn.BatchNorm3d(self.blockInputChannels)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool3d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(
-            block, 
-            block_inplanes[0],
-            layers[0], 
-            shortcut_type
+            blockType, 
+            blockInputChannels[0],
+            nLayers[0], 
+            residualTyp
         )
         self.layer2 = self._make_layer(
-            block, 
-            block_inplanes[1], 
-            layers[1],
-            shortcut_type, 
+            blockType, 
+            blockInputChannels[1], 
+            nLayers[1],
+            residualTyp, 
             stride=2
         )
         self.layer3 = self._make_layer(
-            block, 
-            block_inplanes[2], 
-            layers[2], 
-            shortcut_type, 
+            blockType, 
+            blockInputChannels[2], 
+            nLayers[2], 
+            residualTyp, 
             stride=2
         )
         self.layer4 = self._make_layer(
-            block, 
-            block_inplanes[3], 
-            layers[3], 
-            shortcut_type,
+            blockType, 
+            blockInputChannels[3], 
+            nLayers[3], 
+            residualTyp,
             stride=2
         )
 
         self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
-        self.fc = nn.Linear(block_inplanes[3] * block.expansion, n_classes)
-
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d):
-                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
-            elif isinstance(m, nn.BatchNorm3d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
+        self.fc = nn.Linear(blockInputChannels[3] * blockType.expansion, outputC)
 
     def _downsample_basic_block(self, x, planes, stride):
-        out = F.avg_pool3d(x, kernel_size=1, stride=stride)
-        zero_pads = torch.zeros(
-            out.size(0), planes - out.size(1), out.size(2), out.size(3), out.size(4)
+        xx = F.avg_pool3d(x, kernel_size=1, stride=stride)
+        zPads = torch.zeros(
+            xx.size(0), 
+            planes - xx.size(1),
+            xx.size(2), 
+            xx.size(3), 
+            xx.size(4)
         )
-        if isinstance(out.data, torch.cuda.FloatTensor):
-            zero_pads = zero_pads.cuda()
+        if isinstance(xx.data, torch.cuda.FloatTensor):
+            zPads = zPads.cuda()
 
-        out = torch.cat([out.data, zero_pads], dim=1)
+        xx = torch.cat([xx.data, zPads], dim=1)
 
-        return out
+        return xx
 
     def _make_layer(self, block, planes, blocks, shortcut_type, stride=1):
         downsample = None
-        if stride != 1 or self.in_planes != planes * block.expansion:
+        if stride != 1 or self.blockInputChannels != planes * block.expansion:
             if shortcut_type == "A":
                 downsample = partial(
                     self._downsample_basic_block,
@@ -395,23 +422,23 @@ class Transformer3d(nn.Module):
                 )
             else:
                 downsample = nn.Sequential(
-                    conv1x1x1(self.in_planes, planes * block.expansion, stride),
+                    conv1x1x1(self.blockInputChannels, planes * block.expansion, stride),
                     nn.BatchNorm3d(planes * block.expansion),
                 )
 
         layers = []
         layers.append(
             block(
-                in_planes=self.in_planes,
+                in_planes=self.blockInputChannels,
                 planes=planes,
                 stride=stride,
                 downsample=downsample,
                 transf=False,
             )
         )
-        self.in_planes = planes * block.expansion
+        self.blockInputChannels = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(block(self.in_planes, planes))
+            layers.append(block(self.blockInputChannels, planes))
 
         return nn.Sequential(*layers)
 
@@ -419,42 +446,17 @@ class Transformer3d(nn.Module):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        if not self.no_max_pool:
+        if not self.notHasMaxPool:
             x = self.maxpool(x)
-
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-
         x = self.avgpool(x)
-
         x = x.view(x.size(0), -1)
         x = self.fc(x)
-
         return x
 
 
 def used_model():
     return Transformer3d(Bottleneck, [3, 4, 23, 3], [64, 128, 256, 512])
-
-
-# def generate_model(model_depth, **kwargs):
-#     assert model_depth in [10, 18, 34, 50, 101, 152, 200]
-
-#     if model_depth == 10:
-#         model = Transformer3d(BasicBlock, [1, 1, 1, 1], get_inplanes(), **kwargs)
-#     elif model_depth == 18:
-#         model = Transformer3d(BasicBlock, [2, 2, 2, 2], get_inplanes(), **kwargs)
-#     elif model_depth == 34:
-#         model = Transformer3d(BasicBlock, [3, 4, 6, 3], get_inplanes(), **kwargs)
-#     elif model_depth == 50:
-#         model = Transformer3d(Bottleneck, [3, 4, 6, 3], get_inplanes(), **kwargs)
-#     elif model_depth == 101:
-#         model = Transformer3d(Bottleneck, [3, 4, 23, 3], get_inplanes(), **kwargs)
-#     elif model_depth == 152:
-#         model = Transformer3d(Bottleneck, [3, 8, 36, 3], get_inplanes(), **kwargs)
-#     elif model_depth == 200:
-#         model = Transformer3d(Bottleneck, [3, 24, 36, 3], get_inplanes(), **kwargs)
-
-#     return model

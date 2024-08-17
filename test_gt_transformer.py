@@ -1,3 +1,4 @@
+import itertools
 from pathlib import Path
 import numpy as np
 import torch
@@ -10,20 +11,23 @@ import argparse
 from rich.progress import track
 from tqdm import tqdm
 from enum import Enum
+import time
 
 import Transformer3D
-from code3.zihan.rotate_fields import gen_rotated_matrix
-from task_utils import easy_logger, getMemInfo
+from rotate_fields import gen_rotated_matrix
+from task_utils import catch_any_error, easy_logger, getMemInfo
 from tools import read_slice_of_file
+from constants import TestConstants
 
 logger = easy_logger()
+const = TestConstants()
 
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', type=str, default='cuda:0', help='device')
-    parser.add_argument('--pos_n', type=int, default=1, help='posN')
-    parser.add_argument('--loading_strategy', type=str, default='ALL', help='loading strategy', choices=['ALL', 'PART', 'ONFLY'])
-    
+    parser.add_argument('--posN', type=int, default=2, help='posN', choices=[1, 2, 3])
+    parser.add_argument('--loadingStrategy', type=str, default='NPART', help='loading strategy', 
+                        choices=['ALL', 'NPART', 'PART', 'ONFLY'])    
     args = parser.parse_args()
     
     return args
@@ -33,34 +37,32 @@ args = get_args()
 ## configures
 device = args.device
 torch.cuda.set_device(device)
-posN = args.pos_n
-acIndices = {
-    1: [0, 500],
-    2: [500, 1000],
-    3: [1000, 1500],
-}
-angle = {1: -120, 2: 120, 3: 0}[posN]
+posN = args.posN
+acIndices = const.acIndices
+angle = const.angle[posN]
 rotateFn = gen_rotated_matrix(angle) if angle != 0 else lambda x: x
 
 class LoadingStrategy(Enum):
     ALL = 0
-    PART = 1
-    ONFLY = 2
+    NPART = 1
+    PART = 2
+    ONFLY = 3
     
 loadingStrategy = {"ALL": LoadingStrategy.ALL, 
+                   "NPART": LoadingStrategy.NPART,
                    "PART": LoadingStrategy.PART, 
-                   "ONFLY": LoadingStrategy.ONFLY}[args.loading_strategy]
+                   "ONFLY": LoadingStrategy.ONFLY}[args.loadingStrategy]
 
-# weightPath = {
-#     1: "/Data3/cao/ZiHanCao/huawei_contest/code3/zihan/ckpts/finetuneTransformerP1/ep_1_iter199.pth",
-#     2: "/Data3/cao/ZiHanCao/huawei_contest/code3/zihan/ckpts/finetuneTransformerP2/ep_1_iter99.pth",
-#     3: "/Data3/cao/ZiHanCao/huawei_contest/code3/zihan/ckpts/finetuneTransformer3dP3/ep_1_iter199.pth",
-# }[posN]
 weightPath = {
-    1: "ckpts/R3P1.pth",
-    2: "ckpts/R3P2.pth",
-    3: "ckpts/R3P3.pth",
+    1: "/Data3/cao/ZiHanCao/huawei_contest/code3/zihan/ckpts/finetuneTransformerP1/ep_1_iter199.pth",
+    2: "/Data3/cao/ZiHanCao/huawei_contest/code3/zihan/ckpts/finetuneTransformerP2/ep_1_iter99.pth",
+    3: "/Data3/cao/ZiHanCao/huawei_contest/code3/zihan/ckpts/finetuneTransformer3dP3/ep_1_iter199.pth",
 }[posN]
+# weightPath = {
+#     1: "ckpts/R3P1.pth",
+#     2: "ckpts/R3P2.pth",
+#     3: "ckpts/R3P3.pth",
+# }[posN]
 acFile = f"h5file/R3Anchors/Round3PosAll.txt"
 acFile2 = f"h5file/R3Anchors/Round3InputPos{posN}.txt"
 infFile = f"results/Round3OutputPos{posN}.txt"
@@ -68,47 +70,28 @@ h5FilePath = f"h5file/R3P{posN}"
 logger.info(f"use {posN=}\n\n")
 logger.info(f'inference file will be saved at {infFile}')
 
-factor = 100
-SNum = 20000
-sNumR1 = 0
-SNumTest = 0
-AcLen = 500
+factor = const.factor
+SNum = const.SNum
+sNumR1 = const.sNumR1
+SNumTest = const.SNumTest
+AcLen = const.AcLen
 
 
 class TestDataset(Dataset):
     def __init__(self):
         super().__init__()
-        # test_dir = f"/Data3/cao/ZiHanCao/huawei_contest/data/Round3Pos{pos_n}/test_gt_64.h5"
-        # testPath = f"/Data4/exps/dataset/Round3Pos{posN}_test_gt_64.h5"
-        testPath = f"/Data3/cao/ZiHanCao/huawei_contest/code3/zihan/h5file/Round3Pos{posN}_test_gt_64_normed.h5"
+        testPath = "your/path/to/testData.h5"
         testFile = h5py.File(testPath, "r")
         logger.warning('ready to load all data into RAM, may cause OOM.')
         logger.warning('and this may consume 80G RAM or more.')
         self.testData = testFile["data"][:]
         logger.info(f"chunks: {self.testData.chunks}")
-        # global_idx_to_local = {}
-        
-        # for i in range(total_len):
-        #     global_idx_to_local[i] = (0, i)
-
-        # self.global_idx_to_local = global_idx_to_local
-        # data_files = [test_file]
-        # self.data_files = data_files
-
-        # self.datalist = []
 
     def __len__(self) -> int:
         return self.testData.shape[0]
 
     def __getitem__(self, index):
-        # global_idx = index
-        # dataset_idx, idx = self.global_idx_to_local[global_idx]
-
-        # rand_data = self.data_files[dataset_idx][idx]
-
-        # return rand_data
-        
-        return torch.from_numpy(self.testData[index])#.cuda(device=device, non_blocking=True)
+        return torch.from_numpy(self.testData[index])
 
 
 class LRUCache:
@@ -136,8 +119,7 @@ class LRUCache:
 class TestDataset2(Dataset):
     def __init__(self, cache_size=1000):
         super().__init__()
-        test_dir = f"/Data3/cao/ZiHanCao/huawei_contest/data/Round3Pos{posN}/test_gt_64.h5"
-        # test_dir = f"/Data4/exps/dataset/Round3Pos{pos_n}_test_gt_64.h5"
+        test_dir = "your/path/to/testData.h5"
         self.test_file = h5py.File(test_dir, "r", swmr=True)["data"]
         print(f'chunks: {self.test_file.chunks}')
         self.total_len = self.test_file.shape[0]
@@ -190,6 +172,18 @@ class TestSplitedDataset(Dataset):
     """
     BaiduCloudDisk only support <= 20G file, so we need to split the file.
     To ensure the test, we load the all of the list of splited datasets in the directory.
+    
+    Initialize the TestSplitedDataset.
+    Parameters:
+        - h5_dir (str): The directory path where the h5 files are located.
+        Get the total number of samples in the dataset.
+    Returns:
+        - int: The total number of samples.
+        Get a specific sample from the dataset.
+    Parameters:
+        - index (int): The index of the sample to retrieve.
+    Returns:
+        - torch.Tensor: The data of the sample.
     """
     def __init__(self, h5_dir: str):
         super().__init__()
@@ -213,6 +207,10 @@ class TestSplitedDataset(Dataset):
         if loadingStrategy == LoadingStrategy.PART:
             self.data = None
             self.sub_h5_idx = -1
+        elif loadingStrategy == LoadingStrategy.NPART:
+            self.n_part = 3
+            self.data = [None] * self.n_part
+            self.sequetial_loaded_n = 0
         elif loadingStrategy == LoadingStrategy.ALL:
             self.data = self._all_load_h5_file()
         elif loadingStrategy == LoadingStrategy.ONFLY:
@@ -220,6 +218,26 @@ class TestSplitedDataset(Dataset):
             self.sub_h5_idx = 0
         else:
             raise ValueError('invalid loading strategy.')
+        
+    def _n_part_load_h5_file(self, idx):
+        idx = idx - self.sequetial_loaded_n * 2000
+        
+        if idx < self.n_part * 2000 and idx != 0:
+            sub_h5_idx = idx // 2000
+            in_h5_idx = idx % 2000
+            return self.data[sub_h5_idx][in_h5_idx]
+        else:
+            for i in range(self.n_part):
+                self.data[i] = None
+                logger.info(f'=========loading 2000 samples from [{self.sequetial_loaded_n + i}] h5 file============')
+                if self.sequetial_loaded_n + i >= len(self.h5_files):
+                    logger.info('all h5 files have been loaded.')
+                    break
+                self.data[i] = self.h5_files[self.sequetial_loaded_n + i]['data'][:]
+                getMemInfo(logger)
+            self.sequetial_loaded_n += self.n_part
+            
+            return self.data[0][0]
         
     def _part_load_h5_file(self, idx):
         # h5 file index 0 -> 0 ~ 2000
@@ -235,7 +253,8 @@ class TestSplitedDataset(Dataset):
             logger.info(f'========================[{self.sub_h5_idx}]/[{len(self.h5_files)}]===========================')
             logger.info(f'loading 2000 samples from [{self.sub_h5_idx}] h5 file...')
             # self.data = f['data'][:2000]  # 2000 is the number of samples in each h5 file
-            self.data = self._per_sample_fast_loading(f['data'])
+            # self.data = self._per_sample_fast_loading(f['data'])
+            self.data = f['data'][:]
             f.close()
             getMemInfo(logger)
             
@@ -257,9 +276,8 @@ class TestSplitedDataset(Dataset):
             data_lst.append(f['data'][:])
             getMemInfo(logger)
             logger.info(f'loading data from [{f.filename}] h5 file...')
-        data = np.concatenate(data_lst, axis=0)
         
-        return data
+        return data_lst
     
     def _on_fly_load_h5_file(self, idx):
         sub_h5_max_idx = (self.sub_h5_idx + 1) * 2000  # max value of the data range
@@ -285,19 +303,30 @@ class TestSplitedDataset(Dataset):
     def __getitem__(self, index) -> torch.Tensor:
         if loadingStrategy == LoadingStrategy.PART:
             data = self._part_load_h5_file(index)
-            data = torch.from_numpy(data)
         elif loadingStrategy == LoadingStrategy.ALL:
-            data = torch.from_numpy(self.data[index])
-        else:
+            lst_idx = index // 2000
+            in_h5_idx = index % 2000
+            data = self.data[lst_idx][in_h5_idx]
+        elif loadingStrategy == LoadingStrategy.ONFLY:
             data = self._on_fly_load_h5_file(index)
-            data = torch.from_numpy(data)
-        
+        elif loadingStrategy == LoadingStrategy.NPART:
+            data = self._n_part_load_h5_file(index)
+            
+        data = torch.from_numpy(data)
         return data
-    
-    
+
+
+# taken from `demo_code.py`
+def read_slice_of_file(file_path, start, end):
+    with open(file_path, "r") as file:
+        slice_lines = list(itertools.islice(file, start, end))
+    return slice_lines
 
 class Runner:
+    timeLst = []
+    
     @classmethod
+    @torch.no_grad()
     def inference(cls) -> None:
         anchor = read_slice_of_file(acFile, *acIndices[posN])
         acAll = np.loadtxt(anchor).reshape(AcLen, 2)
@@ -306,33 +335,21 @@ class Runner:
         ac2All = np.loadtxt(ac2).reshape(AcLen, 3)
         index = ac2All[:, 0]
         index = list(np.int32(index))
+        # index = ac2All.flatten().astype(np.int32).tolist()
 
-        # state_dict = torch.load(weight_path)
-        # model = generate_model_3d(10)
-        # model.load_state_dict(state_dict)
-
-        # for n, m in model.named_modules():
-        #     if isinstance(m, (nn.BatchNorm3d, nn.BatchNorm2d)):
-        #         m.track_running_stats = False
-        #         logger.info(f"{n} is set to track_running_stats=False")
-
-        model = Transformer3D.generate_model(101)
+        model = Transformer3D.used_model()
         model.load_state_dict(torch.load(weightPath))
-        # model = torch.load(weight_path)
         logger.info("model loaded.")
         model.eval()
 
         logger.info("loading dataset...")
-        # test_dataset = TestDataset()
         test_dataset = TestSplitedDataset(h5FilePath)
         test_loader = DataLoader(
             test_dataset,
             shuffle=False,
             batch_size=32,
             num_workers=0,
-            # prefetch_factor=200,
-            # pin_memory=True,
-            # pin_memory_device=device,
+            pin_memory=True,
         )
 
         model = model.cuda(device=device)
@@ -341,51 +358,51 @@ class Runner:
         logger.info("model predict...")
         file = open(infFile, "w")
         
-        k = 0
+        gtListIdx = 0
         bs = test_loader.batch_size
-        with torch.no_grad():
-            error = 0
-            for i, xx in track(enumerate(test_loader), total=len(test_loader),
-                               description='Inference ...'):
-                xx = xx.cuda(device=device, non_blocking=True)
+        error = 0
+        formatString = '{:.4f} {:.4f}\n'
+        for i, xx in track(enumerate(test_loader), total=len(test_loader),
+                            description='Inference ...'):
+            xx = xx.cuda(non_blocking=True)
 
-                xy = model(xx)
-                xy = rotateFn(xy)
-                for ii in range(xx.shape[0]):
-                    gi = bs * i + ii
+            xy = model(xx)
+            xy = rotateFn(xy)
+            if loadingStrategy != LoadingStrategy.ONFLY:
+                endTimeFn = cls.time_it()
+            
+            for ii in range(xx.shape[0]):
+                gi = bs * i + ii
 
-                    # if in the AC list
-                    if gi + 1 in index:
-                        logger.info(f"{k}: {acPos[k,:]}")
-                        pos = acPos[k, :]
-                        pos = rotateFn(pos[None].to(xy)).detach().cpu().numpy()[0]
-                        pos = "%.4f %.4f\n" % (pos[0], pos[1])
-                        file.write(pos)
-                        k += 1
-                    else:
-                        logger.info(f"model pred: {xy[ii]}")
-                        pos = "%.4f %.4f\n" % (xy[ii][0], xy[ii][1])
-                        file.write(pos)
-                        
-                        
-                        # output.append(xy[ii].detach().cpu().numpy())
-
-                # if i + 1 in index[:]:
-                #     logger.info(f"{k}: {anchor_pos[k,:]}")
-                #     output.append(anchor_pos[k : k + 1, :])
-                #     k += 1
-                # else:
-                #     xy = model(data)
-                #     logger.info(f"model pred: {xy}")
-                #     output.append(xy.detach().cpu().numpy())
-        # return output
+                # if in the AC list
+                if gi + 1 in index:
+                    logger.info(f"{gtListIdx}: {acPos[gtListIdx, :]}")
+                    pos = acPos[gtListIdx, :]
+                    pos = rotateFn(pos[None].to(xy)).detach().cpu().numpy()[0]
+                    pos = formatString.format(pos[0], pos[1])
+                    file.write(pos)
+                    gtListIdx += 1
+                else:
+                    logger.info(f"model pred: {xy[ii]}")
+                    pos = formatString.format(xy[ii][0], xy[ii][1])
+                    file.write(pos)
+            if loadingStrategy != LoadingStrategy.ONFLY:
+                endTimeFn()
+                logger.info(f'inference time total: {np.sum(cls.timeLst):.3f} second')
+        
         file.close()
-
-
-if __name__ == "__main__":
-    output = Runner.inference()
     
-    # ds = TestSplitedDataset("/Data3/cao/ZiHanCao/huawei_contest/code3/zihan/h5file/R3P1")
-    # dl = DataLoader(ds, batch_size=32, num_workers=0, pin_memory=True)
-    # for i, data in track(enumerate(dl), total=len(dl), description='Inference ...'):
-    #     pass
+    @classmethod  
+    def time_it(cls):
+        t1 = time.time()
+        def _end_time():
+            t2 = time.time()
+            cls.timeLst.append(t2 - t1)
+            logger.info(f"Time: {t2 - t1:.2f}s")
+            
+        return _end_time
+        
+        
+if __name__ == "__main__":
+    with catch_any_error():
+        output = Runner.inference()
