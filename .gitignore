@@ -8,3 +8,5 @@
 **/build/
 **/__pycache__/
 **baidu**
+
+!算法设计文档/*.png
