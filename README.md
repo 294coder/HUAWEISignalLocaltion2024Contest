@@ -1,8 +1,8 @@
-# 华为无线通信菁英赛
+# 华为无线通信菁英赛前十解决方案
 
 <div align="center">
 <p style="text-align: center">
-     <a href="https://scholar.google.com/citations?user=pv61p_EAAAAJ&hl=en", style="font-size: 18px;">Zihan Cao (曹子晗)</a>
+     <a style="font-size: 18px;">队名：winkwink</a>
      <br>
      <a style="font-size: 16px;"> University of Electronic Science Technology of China (电子科技大学)</a>
 </p>
@@ -108,18 +108,18 @@ def dataTransforming(cfgPath, N, GTPath, dataPath, h5Path, chunkSize):
 1. 在Round2和Round3的数据上进行训练后；
 2. 再在单个场景上进行微调。
 
-训练代码见`train_transformer3d_p1.py`。
+训练代码见`train.py`。
 
 这里以pos1为例，首先进行预训练：
 ```sh
-python train_transformer3d_p1.py --R3DataPath <D1> --R2DataPathP1 <D2> --R2DataPathP2 <D3> --R2DataPathP3 <D4> --R3GTPath <AP1> --R2GTPath <AP2> --R3TestDataPath <TD> --R3TestGTPath <TAP> --prefixWeightName "TransformerP1"
+python train.py --R3DataPath <D1> --R2DataPathP1 <D2> --R2DataPathP2 <D3> --R2DataPathP3 <D4> --R3GTPath <AP1> --R2GTPath <AP2> --R3TestDataPath <TD> --R3TestGTPath <TAP> --prefixWeightName "TransformerP1"
 ```
 其中，`R3DataPath`是Round3单个场景的h5训练数据，`R2DataPathP{1-3}`是Round2的预训练h5数据，`R3GTPath`是Round3单个场景的gt，`R2GTPath`是Round2的gt，`R3TestDataPath`是Round3单个场景的h5测试数据，`R3TestGTPath`是Round3单个场景测试gt。
 
 
 预训练完成后，模型文件将会存在`ckpt/TransformerP1`中，再对单个场景进行微调：
 ```sh
-python train_transformer3d_p1.py --R3DataPath <D1> --R3GTPath <AP1> --R3TestDataPath <TD> --R3TestGTPath --pretrainedWeightPath <PW> --finetune --prefixWeightName "TransformerP1"
+python test.py --R3DataPath <D1> --R3GTPath <AP1> --R3TestDataPath <TD> --R3TestGTPath --pretrainedWeightPath <PW> --finetune --prefixWeightName "TransformerP1"
 ```
 
 训练完成后，模型文件将会存在`ckpt/finetuneTransformerP1`中。
