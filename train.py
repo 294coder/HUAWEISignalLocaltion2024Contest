@@ -21,7 +21,7 @@ from constants import TrainingConstants
 logger = easy_logger()
 const = TrainingConstants()
 
-def parse_opt(known=False):
+def parse_opt():
     parser = argparse.ArgumentParser()
 
     posN = 1
@@ -48,14 +48,14 @@ def parse_opt(known=False):
     parser.add_argument("--prefixWeightName", type=str, default="TransformerP1")
     
     # dataset files
-    parser.add_argument("--R3DataPath", type=str, default="h5files/data/Round3Pos1/train_new64.h5")
+    parser.add_argument("--R3DataPath", type=str, default="h5files/data/Round3Pos1/train.h5")
     parser.add_argument("--R2DataPathP1", type=str, default="h5files/data/Round2Pos1/train.h5")
     parser.add_argument("--R2DataPathP2", type=str, default="h5files/data/Round2Pos2/train.h5")
     parser.add_argument("--R2DataPathP3", type=str, default="h5files/data/Round2Pos3/train.h5")
-    parser.add_argument("--R3GTPath", type=str, default="h5files/anchor/round3Pos123P3.txt")
-    parser.add_argument("--R2GTPath", type=str, default="h5files/anchor/round2Pos123P3.txt")
-    parser.add_argument("--R3TestDataPath", type=str, default="h5files/data/test/test_new64.h5")
-    parser.add_argument("--R3TestGTPath", type=str, default="h5files/anchor/round3Pos123P3_test.txt")
+    parser.add_argument("--R3GTPath", type=str, default="h5files/anchor/Round3Pos123P3.txt")
+    parser.add_argument("--R2GTPath", type=str, default="h5files/anchor/Round2Pos123P3.txt")
+    parser.add_argument("--R3TestDataPath", type=str, default="h5files/data/test/testR3.h5")
+    parser.add_argument("--R3TestGTPath", type=str, default="h5files/anchor/round3Pos123Test.txt")
     
     opt = parser.parse_args()
     
