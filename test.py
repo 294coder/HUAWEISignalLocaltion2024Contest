@@ -27,6 +27,7 @@ def get_args():
     parser.add_argument('--posN', type=int, default=2, help='posN', choices=[1, 2, 3])
     parser.add_argument('--loadingStrategy', type=str, default='NPART', help='loading strategy', 
                         choices=['ALL', 'NPART', 'PART', 'ONFLY'])    
+    parser.add_argument('--batchSize', type=int, default=32, help='batch size')
     args = parser.parse_args()
     
     return args
@@ -195,10 +196,10 @@ class TestSplitedDataset(Dataset):
         self.total_len = 20000
         assert self.total_len == 20000, 'the total number of samples must be 20000.'
         
-        if loadingStrategy in (LoadingStrategy.PART, LoadingStrategy.ALL):
+        if loadingStrategy == LoadingStrategy.ALL:
             logger.warning('ready to load all data into RAM, may cause OOM.')
             logger.warning('and this may consume [red]80G[/red] RAM or more.')
-        else:
+        elif loadingStrategy == LoadingStrategy.ONFLY:
             logger.warning('ready to load data on fly, this strategy is really slow, use it when the RAM is limited.')
         
         if loadingStrategy == LoadingStrategy.PART:
@@ -344,8 +345,8 @@ class Runner:
         test_loader = DataLoader(
             test_dataset,
             shuffle=False,
-            batch_size=32,
-            num_workers=0,
+            batch_size=args.batchSize,
+            num_workers=0,  # must be 0
             pin_memory=True,
         )
 
@@ -369,7 +370,7 @@ class Runner:
             for ii in range(xx.shape[0]):
                 gi = bs * i + ii
 
-                # if in the AC list
+                # if in the GT list
                 if gi + 1 in index:
                     logger.info(f"{gtListIdx}: {acPos[gtListIdx, :]}")
                     pos = acPos[gtListIdx, :]
@@ -386,6 +387,7 @@ class Runner:
                 logger.info(f'[red underline]inference time total: {np.sum(cls.timeLst):.3f} second[/red underline]')
         
         file.close()
+        logger.info('inference done.')
     
     @classmethod  
     def time_it(cls):

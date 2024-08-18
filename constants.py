@@ -3,6 +3,9 @@ from dataclasses import dataclass, field
 
 @dataclass
 class TrainingConstants:
+    """
+        Training Constants for the training script
+    """
     R3NTrain: int = 450
     R2NTrain: int = 2760
     R3NValid: int = 50
@@ -13,6 +16,9 @@ class TrainingConstants:
 
 @dataclass
 class TestConstants:
+    """
+        Test Constants for the training script
+    """
     factor: int = 100
     SNum: int = 20000
     sNumR1: int = 0

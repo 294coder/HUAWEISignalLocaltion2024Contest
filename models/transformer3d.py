@@ -338,7 +338,7 @@ class Transformer3d(nn.Module):
         InputConvTSize: int = 7,
         InputConvTStride: int = 1,
         NotHasMaxPool: bool = False,
-        residualTyp: str = "B",
+        residualType: str = "B",
         Factor: float = 1.,
         outputC: int = 2,
     ):
@@ -360,38 +360,39 @@ class Transformer3d(nn.Module):
         self.bn1 = nn.BatchNorm3d(self.blockInputChannels)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool3d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(
+        # 4 layers
+        self.layer1 = self.make_feat_layer(
             blockType, 
             blockInputChannels[0],
             nLayers[0], 
-            residualTyp
+            residualType
         )
-        self.layer2 = self._make_layer(
+        self.layer2 = self.make_feat_layer(
             blockType, 
             blockInputChannels[1], 
             nLayers[1],
-            residualTyp, 
-            stride=2
+            residualType, 
+            convStride=2
         )
-        self.layer3 = self._make_layer(
+        self.layer3 = self.make_feat_layer(
             blockType, 
             blockInputChannels[2], 
             nLayers[2], 
-            residualTyp, 
-            stride=2
+            residualType, 
+            convStride=2
         )
-        self.layer4 = self._make_layer(
+        self.layer4 = self.make_feat_layer(
             blockType, 
             blockInputChannels[3], 
             nLayers[3], 
-            residualTyp,
-            stride=2
+            residualType,
+            convStride=2
         )
 
         self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
         self.fc = nn.Linear(blockInputChannels[3] * blockType.expansion, outputC)
 
-    def _downsample_basic_block(self, x, planes, stride):
+    def downsample_any_block(self, x, planes, stride):
         xx = F.avg_pool3d(x, kernel_size=1, stride=stride)
         zPads = torch.zeros(
             xx.size(0), 
@@ -407,34 +408,39 @@ class Transformer3d(nn.Module):
 
         return xx
 
-    def _make_layer(self, block, planes, blocks, shortcut_type, stride=1):
-        downsample = None
-        if stride != 1 or self.blockInputChannels != planes * block.expansion:
-            if shortcut_type == "A":
-                downsample = partial(
-                    self._downsample_basic_block,
-                    planes=planes * block.expansion,
-                    stride=stride,
+    def make_feat_layer(self, 
+                    blockType, 
+                    inChannels,
+                    nBlocks,
+                    residualType,
+                    convStride=1):
+        DBlock = None
+        if convStride != 1 or self.blockInputChannels != inChannels * blockType.expansion:
+            if residualType == "A":
+                DBlock = partial(
+                    self.downsample_any_block,
+                    planes=inChannels * blockType.expansion,
+                    stride=convStride,
                 )
             else:
-                downsample = nn.Sequential(
-                    conv3D1x1(self.blockInputChannels, planes * block.expansion, stride),
-                    nn.BatchNorm3d(planes * block.expansion),
+                DBlock = nn.Sequential(
+                    conv3D1x1(self.blockInputChannels, inChannels * blockType.expansion, convStride),
+                    nn.BatchNorm3d(inChannels * blockType.expansion),
                 )
 
         layers = []
         layers.append(
-            block(
+            blockType(
                 in_planes=self.blockInputChannels,
-                planes=planes,
-                stride=stride,
-                downsample=downsample,
+                planes=inChannels,
+                stride=convStride,
+                downsample=DBlock,
                 transf=False,
             )
         )
-        self.blockInputChannels = planes * block.expansion
-        for i in range(1, blocks):
-            layers.append(block(self.blockInputChannels, planes))
+        self.blockInputChannels = inChannels * blockType.expansion
+        for i in range(1, nBlocks):
+            layers.append(blockType(self.blockInputChannels, inChannels))
 
         return nn.Sequential(*layers)
 
